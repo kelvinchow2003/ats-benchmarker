@@ -5,9 +5,10 @@ export const maxDuration = 30;
 
 async function extractWithPdfjs(data: Uint8Array): Promise<{ text: string; pages: number }> {
   const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  if (pdfjsLib.GlobalWorkerOptions) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "";
-  }
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/legacy/build/pdf.worker.mjs",
+    import.meta.url
+  ).toString();
   const loadingTask = pdfjsLib.getDocument({
     data: new Uint8Array(data),
     useWorkerFetch: false,
