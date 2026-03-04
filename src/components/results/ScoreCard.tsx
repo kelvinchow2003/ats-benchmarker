@@ -41,7 +41,7 @@ export default function ScoreCard({
         const elapsed = now - start;
         const t = Math.min(elapsed / duration, 1);
         const ease = 1 - Math.pow(1 - t, 3);
-        setDisplayScore(Math.round(score * ease));
+        setDisplayScore(Math.round((score ?? 0) * ease));
         if (t < 1) frame = requestAnimationFrame(tick);
       }
 
