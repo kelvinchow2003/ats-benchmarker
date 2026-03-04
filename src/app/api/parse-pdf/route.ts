@@ -47,12 +47,12 @@ export async function POST(request: NextRequest) {
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
-      const strings = content.items
-        .filter(
-          (item): item is { str: string } =>
-            "str" in item && typeof item.str === "string"
-        )
-        .map((item) => item.str);
+      const strings: string[] = [];
+      for (const item of content.items) {
+        if ("str" in item && typeof item.str === "string") {
+          strings.push(item.str);
+        }
+      }
       pageTexts.push(strings.join(" "));
     }
 
