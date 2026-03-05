@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(node -e \"const m = require\\(''pdf-parse''\\); console.log\\(''type:'', typeof m\\); console.log\\(''keys:'', Object.keys\\(m\\)\\); console.log\\(''default:'', typeof m.default\\)\")",
+      "Bash(node -e \"const { PDFParse } = require\\(''pdf-parse''\\); const p = new PDFParse\\(\\); console.log\\(Object.getOwnPropertyNames\\(Object.getPrototypeOf\\(p\\)\\)\\)\")",
+      "Bash(node -e \"const { PDFParse } = require\\(''pdf-parse''\\); const p = new PDFParse\\(\\); const methods = Object.getOwnPropertyNames\\(Object.getPrototypeOf\\(p\\)\\).filter\\(m => m !== ''constructor''\\); console.log\\(''methods:'', methods\\);\")",
+      "Bash(node -e \"const { PDFParse } = require\\(''pdf-parse''\\); const p = new PDFParse\\(\\); const methods = Object.getOwnPropertyNames\\(Object.getPrototypeOf\\(p\\)\\).filter\\(m => m != ''constructor''\\); console.log\\(''methods:'', methods\\);\")",
+      "Bash(node test-pdf.js)",
+      "Bash(npm install pdf-parse@1.1.10)",
+      "Bash(npm view pdf-parse versions --json)",
+      "Bash(npm install pdf-parse@1.1.4)",
+      "Bash(node -e \"const pdfParse = require\\(''pdf-parse''\\); console.log\\(''type:'', typeof pdfParse\\)\")",
+      "Bash(git add package.json package-lock.json src/app/api/parse-pdf/route.ts)",
+      "Bash(git commit:*)"
+    ]
+  }
+}
