@@ -9,6 +9,8 @@ import KeywordGrid from "@/components/results/KeywordGrid";
 import AIFeedbackPanel from "@/components/results/AIFeedbackPanel";
 import SuggestionsPanel from "@/components/results/SuggestionsPanel";
 import SectionScorePanel from "@/components/results/SectionScorePanel";
+import RequirementPriorityPanel from "@/components/results/RequirementPriorityPanel";
+import ResumeQualityPanel from "@/components/results/ResumeQualityPanel";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import ProgressBar from "@/components/ui/ProgressBar";
@@ -20,6 +22,8 @@ import type {
   SuggestionsResult,
   SectionScoringResult,
   KeywordPlacement,
+  RequirementPriorityResult,
+  ResumeQualityResult,
 } from "@/types/evaluation";
 import {
   Cpu,
@@ -28,6 +32,8 @@ import {
   BarChart3,
   Lightbulb,
   LayoutList,
+  ListOrdered,
+  Target,
   Loader2,
 } from "lucide-react";
 
@@ -66,6 +72,14 @@ export default function EvaluatePage() {
     EngineState<SuggestionsResult>
   >({ status: "idle", result: null, error: null });
 
+  // Free analysis states (run in parallel with main engines)
+  const [requirementPriority, setRequirementPriority] = useState<
+    EngineState<RequirementPriorityResult>
+  >({ status: "idle", result: null, error: null });
+  const [resumeQuality, setResumeQuality] = useState<
+    EngineState<ResumeQualityResult>
+  >({ status: "idle", result: null, error: null });
+
   const allDone =
     legacy.status === "done" &&
     semantic.status === "done" &&
@@ -82,6 +96,8 @@ export default function EvaluatePage() {
       setSectionScoring({ status: "idle", result: null, error: null });
       setKeywordPlacements({ status: "idle", result: null, error: null });
       setSuggestions({ status: "idle", result: null, error: null });
+      setRequirementPriority({ status: "idle", result: null, error: null });
+      setResumeQuality({ status: "idle", result: null, error: null });
 
       // Step 1: Parse PDF
       setParseStatus("Extracting text from PDF...");
@@ -179,11 +195,58 @@ export default function EvaluatePage() {
         }
       })();
 
-      // Wait for all engines
+      // Run free analysis engines in parallel (pure TypeScript, no rate limits)
+      const requirementPriorityPromise = (async () => {
+        setRequirementPriority((s) => ({ ...s, status: "running" }));
+        try {
+          const res = await fetch("/api/engines/requirement-priority", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) throw new Error("Requirement priority engine failed");
+          const data: RequirementPriorityResult = await res.json();
+          setRequirementPriority({ status: "done", result: data, error: null });
+          return data;
+        } catch (err) {
+          setRequirementPriority({
+            status: "error",
+            result: null,
+            error: err instanceof Error ? err.message : "Failed",
+          });
+          return null;
+        }
+      })();
+
+      const resumeQualityPromise = (async () => {
+        setResumeQuality((s) => ({ ...s, status: "running" }));
+        try {
+          const res = await fetch("/api/engines/resume-quality", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ resumeText }),
+          });
+          if (!res.ok) throw new Error("Resume quality engine failed");
+          const data: ResumeQualityResult = await res.json();
+          setResumeQuality({ status: "done", result: data, error: null });
+          return data;
+        } catch (err) {
+          setResumeQuality({
+            status: "error",
+            result: null,
+            error: err instanceof Error ? err.message : "Failed",
+          });
+          return null;
+        }
+      })();
+
+      // Wait for all engines (main + free analysis)
       const [legacyResult, semanticResult, aiResult] = await Promise.all([
         legacyPromise,
         semanticPromise,
         aiPromise,
+        requirementPriorityPromise,
+        resumeQualityPromise,
       ]);
 
       // Compute composite score
@@ -332,7 +395,6 @@ export default function EvaluatePage() {
         }
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [label]
   );
 
@@ -529,7 +591,76 @@ export default function EvaluatePage() {
                   matched={legacy.result.matchedKeywords}
                   missing={legacy.result.missingKeywords}
                   placements={keywordPlacements.result ?? undefined}
+                  synonymMatches={legacy.result.synonymMatches}
                 />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Requirement Priority */}
+          {requirementPriority.status !== "idle" && (
+            <Card className="animate-fade-in-up">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <ListOrdered className="w-4 h-4 text-orange-400" />
+                  <h2 className="text-sm font-semibold text-slate-200">
+                    Requirement Priority Analysis
+                  </h2>
+                  {requirementPriority.status === "running" && (
+                    <Loader2 className="w-3.5 h-3.5 text-slate-500 animate-spin" />
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {requirementPriority.status === "running" && (
+                  <p className="text-sm text-slate-500">
+                    Analyzing requirement priorities...
+                  </p>
+                )}
+                {requirementPriority.status === "done" &&
+                  requirementPriority.result && (
+                    <RequirementPriorityPanel
+                      result={requirementPriority.result}
+                    />
+                  )}
+                {requirementPriority.status === "error" && (
+                  <p className="text-sm text-slate-500">
+                    Requirement priority analysis unavailable
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Resume Quality / Impact */}
+          {resumeQuality.status !== "idle" && (
+            <Card className="animate-fade-in-up">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-cyan-400" />
+                  <h2 className="text-sm font-semibold text-slate-200">
+                    Resume Impact Analysis
+                  </h2>
+                  {resumeQuality.status === "running" && (
+                    <Loader2 className="w-3.5 h-3.5 text-slate-500 animate-spin" />
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {resumeQuality.status === "running" && (
+                  <p className="text-sm text-slate-500">
+                    Analyzing bullet point quality...
+                  </p>
+                )}
+                {resumeQuality.status === "done" &&
+                  resumeQuality.result && (
+                    <ResumeQualityPanel result={resumeQuality.result} />
+                  )}
+                {resumeQuality.status === "error" && (
+                  <p className="text-sm text-slate-500">
+                    Resume quality analysis unavailable
+                  </p>
+                )}
               </CardContent>
             </Card>
           )}

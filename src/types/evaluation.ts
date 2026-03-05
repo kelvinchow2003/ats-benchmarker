@@ -6,6 +6,48 @@ export interface LegacyResult {
   missingKeywords: string[];
   totalJDKeywords: number;
   matchRate: number;
+  synonymMatches?: Record<string, string>;
+}
+
+/* ── Requirement Priority Parsing ── */
+
+export type RequirementPriority = "required" | "preferred" | "bonus";
+
+export interface PrioritizedRequirement {
+  keyword: string;
+  priority: RequirementPriority;
+  matched: boolean;
+  context: string;
+}
+
+export interface RequirementPriorityResult {
+  requirements: PrioritizedRequirement[];
+  requiredMatchRate: number;
+  preferredMatchRate: number;
+  bonusMatchRate: number;
+  weightedScore: number;
+}
+
+/* ── Resume Quality / Impact Analysis ── */
+
+export interface BulletAnalysis {
+  text: string;
+  hasMetrics: boolean;
+  hasActionVerb: boolean;
+  actionVerb: string | null;
+  metrics: string[];
+  rating: "strong" | "moderate" | "weak";
+}
+
+export interface ResumeQualityResult {
+  bullets: BulletAnalysis[];
+  totalBullets: number;
+  bulletsWithMetrics: number;
+  bulletsWithActionVerbs: number;
+  metricsRate: number;
+  actionVerbRate: number;
+  overallRating: "strong" | "moderate" | "weak";
+  score: number;
 }
 
 export interface SemanticResult {

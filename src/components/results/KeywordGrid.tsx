@@ -8,6 +8,7 @@ interface KeywordGridProps {
   matched: string[];
   missing: string[];
   placements?: KeywordPlacement[];
+  synonymMatches?: Record<string, string>;
 }
 
 const IMPORTANCE_ORDER = { critical: 0, important: 1, "nice-to-have": 2 };
@@ -21,6 +22,7 @@ export default function KeywordGrid({
   matched,
   missing,
   placements,
+  synonymMatches,
 }: KeywordGridProps) {
   const [filter, setFilter] = useState("");
   const [view, setView] = useState<"all" | "matched" | "missing">("all");
@@ -91,15 +93,24 @@ export default function KeywordGrid({
       {/* Chips */}
       <div className="flex flex-wrap gap-2">
         {showMatched &&
-          filteredMatched.map((kw) => (
-            <span
-              key={`m-${kw}`}
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg"
-            >
-              <Check className="w-3 h-3" />
-              {kw}
-            </span>
-          ))}
+          filteredMatched.map((kw) => {
+            const synonym = synonymMatches?.[kw];
+            return (
+              <span
+                key={`m-${kw}`}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg"
+                title={synonym ? `Matched via synonym: ${synonym}` : undefined}
+              >
+                <Check className="w-3 h-3" />
+                {kw}
+                {synonym && (
+                  <span className="text-[10px] text-emerald-500/70 ml-0.5">
+                    via {synonym}
+                  </span>
+                )}
+              </span>
+            );
+          })}
         {showMissing &&
           filteredMissing.map((kw) => {
             const placement = placementMap.get(kw.toLowerCase());

@@ -68,6 +68,103 @@ const COMPOUND_PATTERNS = [
   /\b(quality\s+assurance)\b/gi,
 ];
 
+/* ── Synonym / Acronym Map ──
+   Each entry maps a canonical term to all its known variants.
+   Matching checks if the resume contains ANY variant for a JD keyword. */
+const SYNONYM_MAP: Record<string, string[]> = {
+  // Languages
+  "javascript":   ["js", "es6", "es2015", "ecmascript"],
+  "typescript":   ["ts"],
+  "python":       ["py", "python3"],
+  "golang":       ["go"],
+  "c#":           ["csharp", "c-sharp", "dotnet", ".net"],
+  "c++":          ["cpp"],
+  "ruby":         ["rb"],
+  // Frontend
+  "react":        ["reactjs", "react.js"],
+  "angular":      ["angularjs", "angular.js"],
+  "vue":          ["vuejs", "vue.js"],
+  "next.js":      ["nextjs", "next"],
+  "nuxt":         ["nuxtjs", "nuxt.js"],
+  "tailwind":     ["tailwindcss", "tailwind css"],
+  // Backend
+  "node.js":      ["nodejs", "node"],
+  "express":      ["expressjs", "express.js"],
+  "django":       ["drf", "django rest framework"],
+  "spring":       ["spring boot", "springboot"],
+  "fastapi":      ["fast api"],
+  // Databases
+  "postgresql":   ["postgres", "psql"],
+  "mongodb":      ["mongo"],
+  "mysql":        ["mariadb"],
+  "dynamodb":     ["dynamo db"],
+  "elasticsearch":["elastic", "opensearch"],
+  "sqlite":       ["sqlite3"],
+  // Cloud / DevOps
+  "aws":          ["amazon web services", "amazon cloud"],
+  "gcp":          ["google cloud", "google cloud platform"],
+  "azure":        ["microsoft azure", "ms azure"],
+  "kubernetes":   ["k8s", "kube"],
+  "docker":       ["containerization", "containers"],
+  "terraform":    ["iac", "infrastructure as code"],
+  "ci/cd":        ["cicd", "ci cd", "continuous integration", "continuous deployment", "continuous delivery"],
+  "github actions":["gh actions"],
+  // Data / ML
+  "machine learning": ["ml"],
+  "deep learning":    ["dl"],
+  "natural language processing": ["nlp"],
+  "computer vision":  ["cv"],
+  "artificial intelligence": ["ai"],
+  "tensorflow":   ["tf"],
+  "pytorch":      ["torch"],
+  "pandas":       ["pd"],
+  "numpy":        ["np"],
+  "scikit-learn": ["sklearn"],
+  "data science": ["data analytics", "data analysis"],
+  "sql":          ["structured query language"],
+  "nosql":        ["no-sql", "non-relational"],
+  // Tools / Methods
+  "git":          ["version control", "github", "gitlab", "bitbucket"],
+  "agile":        ["scrum", "kanban", "sprint"],
+  "rest api":     ["restful", "restful api"],
+  "graphql":      ["gql"],
+  "microservices":["micro-services", "service-oriented", "soa"],
+  "ui":           ["user interface"],
+  "ux":           ["user experience"],
+  "qa":           ["quality assurance", "quality engineering"],
+  "tdd":          ["test-driven development", "test driven development"],
+  "oop":          ["object-oriented programming", "object oriented"],
+  "sre":          ["site reliability engineering", "site reliability"],
+  "devops":       ["dev ops"],
+  "full-stack":   ["fullstack", "full stack"],
+  "front-end":    ["frontend", "front end"],
+  "back-end":     ["backend", "back end"],
+  "oauth":        ["oauth2", "oauth 2.0"],
+  "jwt":          ["json web token", "json web tokens"],
+  "sso":          ["single sign-on", "single sign on"],
+};
+
+/**
+ * Build a reverse lookup: for any term (canonical or variant), get all synonyms.
+ */
+function getAllSynonyms(keyword: string): string[] {
+  const lower = keyword.toLowerCase();
+
+  // Check if it's a canonical key
+  if (SYNONYM_MAP[lower]) {
+    return [lower, ...SYNONYM_MAP[lower]];
+  }
+
+  // Check if it's a variant
+  for (const [canonical, variants] of Object.entries(SYNONYM_MAP)) {
+    if (variants.some((v) => v.toLowerCase() === lower)) {
+      return [canonical, ...variants];
+    }
+  }
+
+  return [lower];
+}
+
 /**
  * Extract meaningful keywords from text, preserving compound phrases.
  */
@@ -94,7 +191,6 @@ function extractKeywords(text: string): string[] {
 
   for (const word of words) {
     if (STOP_WORDS.has(word)) continue;
-    // Skip if word is part of a compound already captured
     const inCompound = compoundsFound.some((c) => c.includes(word));
     if (inCompound && word.length < 5) continue;
     keywords.add(word);
@@ -104,17 +200,42 @@ function extractKeywords(text: string): string[] {
 }
 
 /**
- * Check if a keyword exists in resume text using word-boundary matching.
+ * Test whether a single term exists in text via word-boundary regex.
  */
-function keywordInText(keyword: string, text: string): boolean {
-  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const regex = new RegExp(`\\b${escaped}\\b`, "i");
-  return regex.test(text);
+function termInText(term: string, text: string): boolean {
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${escaped}\\b`, "i").test(text);
+}
+
+/**
+ * Check if a keyword (or any of its synonyms) exists in resume text.
+ * Returns the synonym that matched, or null if the keyword matched directly.
+ */
+function matchKeyword(
+  keyword: string,
+  text: string
+): { matched: boolean; via: string | null } {
+  // Direct match first
+  if (termInText(keyword, text)) {
+    return { matched: true, via: null };
+  }
+
+  // Synonym match
+  const synonyms = getAllSynonyms(keyword);
+  for (const syn of synonyms) {
+    if (syn.toLowerCase() === keyword.toLowerCase()) continue;
+    if (termInText(syn, text)) {
+      return { matched: true, via: syn };
+    }
+  }
+
+  return { matched: false, via: null };
 }
 
 /**
  * Engine 1: Legacy Keyword ATS scoring.
  * Pure TypeScript — no external APIs needed.
+ * Includes synonym/acronym matching.
  */
 export function runLegacyEngine(
   resumeText: string,
@@ -123,17 +244,23 @@ export function runLegacyEngine(
   const jdKeywords = extractKeywords(jobDescription);
   const matchedKeywords: string[] = [];
   const missingKeywords: string[] = [];
+  const synonymMatches: Record<string, string> = {};
 
   for (const kw of jdKeywords) {
-    if (keywordInText(kw, resumeText)) {
+    const result = matchKeyword(kw, resumeText);
+    if (result.matched) {
       matchedKeywords.push(kw);
+      if (result.via) {
+        synonymMatches[kw] = result.via;
+      }
     } else {
       missingKeywords.push(kw);
     }
   }
 
   const totalJDKeywords = jdKeywords.length;
-  const matchRate = totalJDKeywords > 0 ? matchedKeywords.length / totalJDKeywords : 0;
+  const matchRate =
+    totalJDKeywords > 0 ? matchedKeywords.length / totalJDKeywords : 0;
   const score = Math.round(matchRate * 100);
 
   return {
@@ -142,5 +269,6 @@ export function runLegacyEngine(
     missingKeywords,
     totalJDKeywords,
     matchRate,
+    synonymMatches,
   };
 }
