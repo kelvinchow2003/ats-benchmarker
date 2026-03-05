@@ -31,7 +31,7 @@ const engines = [
     icon: <Sparkles className="w-5 h-5 text-violet-400" />,
     title: "AI Recruiter",
     description:
-      "Gemini 1.5 Flash structured evaluation. Provides verdict, feedback, pros and cons.",
+      "Gemini 2.5 Flash structured evaluation. Provides verdict, feedback, pros and cons.",
     accent: "border-violet-500/20 bg-violet-500/5",
     tag: "Gemini",
     tagColor: "text-violet-400",

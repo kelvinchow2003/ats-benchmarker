@@ -50,6 +50,104 @@ export interface ResumeQualityResult {
   score: number;
 }
 
+/* ── Action Verb Analysis ── */
+
+export interface VerbInstance {
+  verb: string;
+  category: string;
+  text: string;
+}
+
+export interface WeakPhraseInstance {
+  text: string;
+  weakPhrase: string;
+  alternatives: string[];
+}
+
+export interface ActionVerbAnalysisResult {
+  verbInstances: VerbInstance[];
+  weakPhrases: WeakPhraseInstance[];
+  verbFrequency: Record<string, number>;
+  categoryBreakdown: { category: string; count: number }[];
+  topVerbs: { verb: string; count: number }[];
+  overusedVerbs: { verb: string; count: number }[];
+  totalBullets: number;
+  strongVerbCount: number;
+  weakPhraseCount: number;
+  uniqueVerbCount: number;
+  verbDiversity: number;
+  score: number;
+}
+
+/* ── Resume Structure Scoring ── */
+
+export interface SectionPresence {
+  name: string;
+  found: boolean;
+  importance: "critical" | "important" | "optional";
+  idealOrder: number;
+  actualOrder: number;
+}
+
+export interface FormattingIssue {
+  type: string;
+  severity: "warning" | "info";
+  message: string;
+}
+
+export interface StructureScoringResult {
+  sections: SectionPresence[];
+  criticalSectionsFound: number;
+  criticalSectionsTotal: number;
+  importantSectionsFound: number;
+  importantSectionsTotal: number;
+  optionalSectionsFound: number;
+  estimatedPages: number;
+  totalWords: number;
+  totalLines: number;
+  bulletCount: number;
+  avgLineLength: number;
+  lengthAssessment: "too_short" | "ideal" | "slightly_long" | "too_long";
+  formattingIssues: FormattingIssue[];
+  score: number;
+}
+
+/* ── Experience Level Matching ── */
+
+export interface JDExperienceRequirement {
+  minYears: number;
+  maxYears: number | null;
+  field: string | null;
+  rawText: string;
+}
+
+export interface ResumeExperienceEntry {
+  rawText: string;
+  startDate: string;
+  endDate: string;
+  durationMonths: number;
+  durationYears: number;
+  isCurrent: boolean;
+}
+
+export interface ExperienceRequirementMatch {
+  requirement: JDExperienceRequirement;
+  candidateYears: number;
+  gap: number;
+  status: "meets" | "exceeds" | "below";
+}
+
+export interface ExperienceMatchResult {
+  jdRequirements: JDExperienceRequirement[];
+  resumeEntries: ResumeExperienceEntry[];
+  totalYears: number;
+  jdSeniority: string;
+  candidateSeniority: string;
+  requirementMatches: ExperienceRequirementMatch[];
+  overallFit: "good_match" | "under_qualified" | "over_qualified" | "no_data";
+  score: number;
+}
+
 export interface SemanticResult {
   score: number;
   rawSimilarity: number;

@@ -11,6 +11,9 @@ import SuggestionsPanel from "@/components/results/SuggestionsPanel";
 import SectionScorePanel from "@/components/results/SectionScorePanel";
 import RequirementPriorityPanel from "@/components/results/RequirementPriorityPanel";
 import ResumeQualityPanel from "@/components/results/ResumeQualityPanel";
+import ActionVerbPanel from "@/components/results/ActionVerbPanel";
+import StructureScorePanel from "@/components/results/StructureScorePanel";
+import ExperienceMatchPanel from "@/components/results/ExperienceMatchPanel";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import ProgressBar from "@/components/ui/ProgressBar";
@@ -24,6 +27,9 @@ import type {
   KeywordPlacement,
   RequirementPriorityResult,
   ResumeQualityResult,
+  ActionVerbAnalysisResult,
+  StructureScoringResult,
+  ExperienceMatchResult,
 } from "@/types/evaluation";
 import {
   Cpu,
@@ -34,6 +40,9 @@ import {
   LayoutList,
   ListOrdered,
   Target,
+  PenTool,
+  FileCheck,
+  Clock,
   Loader2,
 } from "lucide-react";
 
@@ -79,6 +88,15 @@ export default function EvaluatePage() {
   const [resumeQuality, setResumeQuality] = useState<
     EngineState<ResumeQualityResult>
   >({ status: "idle", result: null, error: null });
+  const [actionVerbAnalysis, setActionVerbAnalysis] = useState<
+    EngineState<ActionVerbAnalysisResult>
+  >({ status: "idle", result: null, error: null });
+  const [structureScoring, setStructureScoring] = useState<
+    EngineState<StructureScoringResult>
+  >({ status: "idle", result: null, error: null });
+  const [experienceMatch, setExperienceMatch] = useState<
+    EngineState<ExperienceMatchResult>
+  >({ status: "idle", result: null, error: null });
 
   const allDone =
     legacy.status === "done" &&
@@ -98,6 +116,9 @@ export default function EvaluatePage() {
       setSuggestions({ status: "idle", result: null, error: null });
       setRequirementPriority({ status: "idle", result: null, error: null });
       setResumeQuality({ status: "idle", result: null, error: null });
+      setActionVerbAnalysis({ status: "idle", result: null, error: null });
+      setStructureScoring({ status: "idle", result: null, error: null });
+      setExperienceMatch({ status: "idle", result: null, error: null });
 
       // Step 1: Parse PDF
       setParseStatus("Extracting text from PDF...");
@@ -240,6 +261,72 @@ export default function EvaluatePage() {
         }
       })();
 
+      const actionVerbPromise = (async () => {
+        setActionVerbAnalysis((s) => ({ ...s, status: "running" }));
+        try {
+          const res = await fetch("/api/engines/action-verb-analysis", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ resumeText }),
+          });
+          if (!res.ok) throw new Error("Action verb analysis failed");
+          const data: ActionVerbAnalysisResult = await res.json();
+          setActionVerbAnalysis({ status: "done", result: data, error: null });
+          return data;
+        } catch (err) {
+          setActionVerbAnalysis({
+            status: "error",
+            result: null,
+            error: err instanceof Error ? err.message : "Failed",
+          });
+          return null;
+        }
+      })();
+
+      const structureScoringPromise = (async () => {
+        setStructureScoring((s) => ({ ...s, status: "running" }));
+        try {
+          const res = await fetch("/api/engines/structure-scoring", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ resumeText }),
+          });
+          if (!res.ok) throw new Error("Structure scoring failed");
+          const data: StructureScoringResult = await res.json();
+          setStructureScoring({ status: "done", result: data, error: null });
+          return data;
+        } catch (err) {
+          setStructureScoring({
+            status: "error",
+            result: null,
+            error: err instanceof Error ? err.message : "Failed",
+          });
+          return null;
+        }
+      })();
+
+      const experienceMatchPromise = (async () => {
+        setExperienceMatch((s) => ({ ...s, status: "running" }));
+        try {
+          const res = await fetch("/api/engines/experience-matching", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) throw new Error("Experience matching failed");
+          const data: ExperienceMatchResult = await res.json();
+          setExperienceMatch({ status: "done", result: data, error: null });
+          return data;
+        } catch (err) {
+          setExperienceMatch({
+            status: "error",
+            result: null,
+            error: err instanceof Error ? err.message : "Failed",
+          });
+          return null;
+        }
+      })();
+
       // Wait for all engines (main + free analysis)
       const [legacyResult, semanticResult, aiResult] = await Promise.all([
         legacyPromise,
@@ -247,6 +334,9 @@ export default function EvaluatePage() {
         aiPromise,
         requirementPriorityPromise,
         resumeQualityPromise,
+        actionVerbPromise,
+        structureScoringPromise,
+        experienceMatchPromise,
       ]);
 
       // Compute composite score
@@ -659,6 +749,105 @@ export default function EvaluatePage() {
                 {resumeQuality.status === "error" && (
                   <p className="text-sm text-slate-500">
                     Resume quality analysis unavailable
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Action Verb Analysis */}
+          {actionVerbAnalysis.status !== "idle" && (
+            <Card className="animate-fade-in-up">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <PenTool className="w-4 h-4 text-pink-400" />
+                  <h2 className="text-sm font-semibold text-slate-200">
+                    Action Verb Analysis
+                  </h2>
+                  {actionVerbAnalysis.status === "running" && (
+                    <Loader2 className="w-3.5 h-3.5 text-slate-500 animate-spin" />
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {actionVerbAnalysis.status === "running" && (
+                  <p className="text-sm text-slate-500">
+                    Analyzing action verbs...
+                  </p>
+                )}
+                {actionVerbAnalysis.status === "done" &&
+                  actionVerbAnalysis.result && (
+                    <ActionVerbPanel result={actionVerbAnalysis.result} />
+                  )}
+                {actionVerbAnalysis.status === "error" && (
+                  <p className="text-sm text-slate-500">
+                    Action verb analysis unavailable
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Resume Structure Scoring */}
+          {structureScoring.status !== "idle" && (
+            <Card className="animate-fade-in-up">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <FileCheck className="w-4 h-4 text-teal-400" />
+                  <h2 className="text-sm font-semibold text-slate-200">
+                    Resume Structure
+                  </h2>
+                  {structureScoring.status === "running" && (
+                    <Loader2 className="w-3.5 h-3.5 text-slate-500 animate-spin" />
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {structureScoring.status === "running" && (
+                  <p className="text-sm text-slate-500">
+                    Evaluating resume structure...
+                  </p>
+                )}
+                {structureScoring.status === "done" &&
+                  structureScoring.result && (
+                    <StructureScorePanel result={structureScoring.result} />
+                  )}
+                {structureScoring.status === "error" && (
+                  <p className="text-sm text-slate-500">
+                    Structure scoring unavailable
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Experience Level Matching */}
+          {experienceMatch.status !== "idle" && (
+            <Card className="animate-fade-in-up">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-indigo-400" />
+                  <h2 className="text-sm font-semibold text-slate-200">
+                    Experience Level Matching
+                  </h2>
+                  {experienceMatch.status === "running" && (
+                    <Loader2 className="w-3.5 h-3.5 text-slate-500 animate-spin" />
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {experienceMatch.status === "running" && (
+                  <p className="text-sm text-slate-500">
+                    Matching experience levels...
+                  </p>
+                )}
+                {experienceMatch.status === "done" &&
+                  experienceMatch.result && (
+                    <ExperienceMatchPanel result={experienceMatch.result} />
+                  )}
+                {experienceMatch.status === "error" && (
+                  <p className="text-sm text-slate-500">
+                    Experience matching unavailable
                   </p>
                 )}
               </CardContent>
