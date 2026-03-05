@@ -1,7 +1,5 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getGeminiModel, extractJSON } from "./gemini-client";
 import type { AIRecruiterResult } from "@/types/evaluation";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 const SYSTEM_PROMPT = `You are an expert technical recruiter evaluating a resume against a job description.
 
@@ -29,15 +27,8 @@ export async function runAIRecruiterEngine(
   resumeText: string,
   jobDescription: string
 ): Promise<AIRecruiterResult> {
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    generationConfig: {
-      temperature: 0.3,
-      maxOutputTokens: 8192,
-    },
-  });
+  const model = await getGeminiModel();
 
-  // Truncate to stay well within token limits
   const maxChars = 12000;
   const trimmedResume = resumeText.slice(0, maxChars);
   const trimmedJD = jobDescription.slice(0, maxChars);
@@ -58,21 +49,7 @@ Respond with ONLY raw JSON matching the required schema. No markdown, no code fe
   });
 
   const text = result.response.text().trim();
-
-  // Extract JSON from the response — handle markdown fences, thinking text, etc.
-  let cleaned = text;
-
-  // Try to extract JSON from markdown code fences first
-  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenceMatch) {
-    cleaned = fenceMatch[1].trim();
-  } else {
-    // Try to extract the first JSON object from the response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      cleaned = jsonMatch[0].trim();
-    }
-  }
+  const cleaned = extractJSON(text);
 
   let parsed: {
     Score: number;
@@ -88,10 +65,8 @@ Respond with ONLY raw JSON matching the required schema. No markdown, no code fe
     throw new Error(`Gemini returned invalid JSON: ${cleaned.slice(0, 200)}`);
   }
 
-  // Validate and clamp score
   const score = Math.max(0, Math.min(100, Math.round(parsed.Score ?? 0)));
 
-  // Normalize verdict
   const validVerdicts = [
     "Strong Match",
     "Moderate Match",

@@ -7,6 +7,8 @@ import ScoreCard from "@/components/results/ScoreCard";
 import CompositeScore from "@/components/results/CompositeScore";
 import KeywordGrid from "@/components/results/KeywordGrid";
 import AIFeedbackPanel from "@/components/results/AIFeedbackPanel";
+import SuggestionsPanel from "@/components/results/SuggestionsPanel";
+import SectionScorePanel from "@/components/results/SectionScorePanel";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import ProgressBar from "@/components/ui/ProgressBar";
@@ -15,8 +17,19 @@ import type {
   SemanticResult,
   AIRecruiterResult,
   EngineState,
+  SuggestionsResult,
+  SectionScoringResult,
+  KeywordPlacement,
 } from "@/types/evaluation";
-import { Cpu, Brain, Sparkles, BarChart3 } from "lucide-react";
+import {
+  Cpu,
+  Brain,
+  Sparkles,
+  BarChart3,
+  Lightbulb,
+  LayoutList,
+  Loader2,
+} from "lucide-react";
 
 export default function EvaluatePage() {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -40,6 +53,18 @@ export default function EvaluatePage() {
 
   const [compositeScore, setCompositeScore] = useState<number | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [label, setLabel] = useState("");
+
+  // Post-analysis states
+  const [sectionScoring, setSectionScoring] = useState<
+    EngineState<SectionScoringResult>
+  >({ status: "idle", result: null, error: null });
+  const [keywordPlacements, setKeywordPlacements] = useState<
+    EngineState<KeywordPlacement[]>
+  >({ status: "idle", result: null, error: null });
+  const [suggestions, setSuggestions] = useState<
+    EngineState<SuggestionsResult>
+  >({ status: "idle", result: null, error: null });
 
   const allDone =
     legacy.status === "done" &&
@@ -54,6 +79,9 @@ export default function EvaluatePage() {
       setLegacy({ status: "idle", result: null, error: null });
       setSemantic({ status: "idle", result: null, error: null });
       setAI({ status: "idle", result: null, error: null });
+      setSectionScoring({ status: "idle", result: null, error: null });
+      setKeywordPlacements({ status: "idle", result: null, error: null });
+      setSuggestions({ status: "idle", result: null, error: null });
 
       // Step 1: Parse PDF
       setParseStatus("Extracting text from PDF...");
@@ -176,18 +204,16 @@ export default function EvaluatePage() {
         } = await supabase.auth.getUser();
 
         if (user && legacyResult && semanticResult && aiResult) {
-          // Save resume
           const { data: resumeRow } = await supabase
             .from("resumes")
             .insert({
               user_id: user.id,
               file_name: pdfFile.name,
-              parsed_text: resumeText.slice(0, 50000), // cap storage
+              parsed_text: resumeText.slice(0, 50000),
             })
             .select("id")
             .single();
 
-          // Save evaluation
           const { data: evalRow } = await supabase
             .from("evaluations")
             .insert({
@@ -206,6 +232,7 @@ export default function EvaluatePage() {
               ai_pros: aiResult.pros,
               ai_cons: aiResult.cons,
               ai_details: aiResult,
+              label: label.trim() || null,
             })
             .select("id")
             .single();
@@ -215,8 +242,98 @@ export default function EvaluatePage() {
       } catch {
         // Silent fail — saving is optional
       }
+
+      // Step 4: Run post-analysis sequentially (respects Gemini rate limits)
+      if (legacyResult && semanticResult && aiResult) {
+        // Section scoring
+        try {
+          setSectionScoring((s) => ({ ...s, status: "running" }));
+          const res = await fetch("/api/engines/section-scoring", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (res.ok) {
+            const data: SectionScoringResult = await res.json();
+            setSectionScoring({ status: "done", result: data, error: null });
+          } else {
+            setSectionScoring({
+              status: "error",
+              result: null,
+              error: "Section scoring failed",
+            });
+          }
+        } catch {
+          setSectionScoring({
+            status: "error",
+            result: null,
+            error: "Section scoring failed",
+          });
+        }
+
+        // Keyword suggestions
+        try {
+          setKeywordPlacements((s) => ({ ...s, status: "running" }));
+          const res = await fetch("/api/engines/keyword-suggestions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...payload,
+              missingKeywords: legacyResult.missingKeywords,
+            }),
+          });
+          if (res.ok) {
+            const data: KeywordPlacement[] = await res.json();
+            setKeywordPlacements({ status: "done", result: data, error: null });
+          } else {
+            setKeywordPlacements({
+              status: "error",
+              result: null,
+              error: "Keyword suggestions failed",
+            });
+          }
+        } catch {
+          setKeywordPlacements({
+            status: "error",
+            result: null,
+            error: "Keyword suggestions failed",
+          });
+        }
+
+        // Improvement suggestions
+        try {
+          setSuggestions((s) => ({ ...s, status: "running" }));
+          const res = await fetch("/api/engines/suggestions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...payload,
+              legacyResult,
+              semanticResult,
+              aiRecruiterResult: aiResult,
+            }),
+          });
+          if (res.ok) {
+            const data: SuggestionsResult = await res.json();
+            setSuggestions({ status: "done", result: data, error: null });
+          } else {
+            setSuggestions({
+              status: "error",
+              result: null,
+              error: "Suggestions failed",
+            });
+          }
+        } catch {
+          setSuggestions({
+            status: "error",
+            result: null,
+            error: "Suggestions failed",
+          });
+        }
+      }
     },
-    []
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [label]
   );
 
   return (
@@ -236,15 +353,26 @@ export default function EvaluatePage() {
         <div className="lg:col-span-2 animate-fade-in-up delay-100">
           <Card>
             <CardHeader>
-              <h2 className="text-sm font-semibold text-slate-200">
-                Input
-              </h2>
+              <h2 className="text-sm font-semibold text-slate-200">Input</h2>
             </CardHeader>
             <CardContent>
               <UploadZone
                 onSubmit={handleSubmit}
                 isProcessing={isProcessing}
               />
+              <div className="mt-4">
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">
+                  Label (optional)
+                </label>
+                <input
+                  type="text"
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  placeholder="e.g., Google SWE Application v2"
+                  maxLength={100}
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                />
+              </div>
               {parseStatus && (
                 <p className="mt-4 text-xs text-slate-400 font-mono">
                   {parseStatus}
@@ -349,6 +477,39 @@ export default function EvaluatePage() {
             </Card>
           )}
 
+          {/* Section Scoring */}
+          {sectionScoring.status !== "idle" && (
+            <Card className="animate-fade-in-up">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <LayoutList className="w-4 h-4 text-blue-400" />
+                  <h2 className="text-sm font-semibold text-slate-200">
+                    Section-by-Section Scoring
+                  </h2>
+                  {sectionScoring.status === "running" && (
+                    <Loader2 className="w-3.5 h-3.5 text-slate-500 animate-spin" />
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {sectionScoring.status === "running" && (
+                  <p className="text-sm text-slate-500">
+                    Analyzing resume sections...
+                  </p>
+                )}
+                {sectionScoring.status === "done" &&
+                  sectionScoring.result && (
+                    <SectionScorePanel result={sectionScoring.result} />
+                  )}
+                {sectionScoring.status === "error" && (
+                  <p className="text-sm text-slate-500">
+                    Section scoring unavailable
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Keyword Grid */}
           {legacy.status === "done" && legacy.result && (
             <Card className="animate-fade-in-up delay-200">
@@ -358,12 +519,16 @@ export default function EvaluatePage() {
                   <h2 className="text-sm font-semibold text-slate-200">
                     Keyword Analysis
                   </h2>
+                  {keywordPlacements.status === "running" && (
+                    <Loader2 className="w-3.5 h-3.5 text-slate-500 animate-spin" />
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
                 <KeywordGrid
                   matched={legacy.result.matchedKeywords}
                   missing={legacy.result.missingKeywords}
+                  placements={keywordPlacements.result ?? undefined}
                 />
               </CardContent>
             </Card>
@@ -382,6 +547,41 @@ export default function EvaluatePage() {
               </CardHeader>
               <CardContent>
                 <AIFeedbackPanel result={ai.result} />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Improvement Suggestions */}
+          {suggestions.status !== "idle" && (
+            <Card className="animate-fade-in-up">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Lightbulb className="w-4 h-4 text-emerald-400" />
+                  <h2 className="text-sm font-semibold text-slate-200">
+                    Improvement Suggestions
+                  </h2>
+                  {suggestions.status === "running" && (
+                    <Loader2 className="w-3.5 h-3.5 text-slate-500 animate-spin" />
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {suggestions.status === "running" && (
+                  <p className="text-sm text-slate-500">
+                    Generating improvement suggestions...
+                  </p>
+                )}
+                {suggestions.status === "done" && suggestions.result && (
+                  <SuggestionsPanel
+                    suggestions={suggestions.result.suggestions}
+                    overallStrategy={suggestions.result.overallStrategy}
+                  />
+                )}
+                {suggestions.status === "error" && (
+                  <p className="text-sm text-slate-500">
+                    Suggestions unavailable
+                  </p>
+                )}
               </CardContent>
             </Card>
           )}

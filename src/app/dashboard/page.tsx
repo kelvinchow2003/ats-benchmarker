@@ -6,6 +6,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { BarChart3, Clock, ArrowRight, FileSearch } from "lucide-react";
 import type { EvaluationRow } from "@/types/evaluation";
+import EvaluationLabel from "@/components/dashboard/EvaluationLabel";
 
 function getScoreBadgeVariant(
   score: number | null
@@ -90,9 +91,11 @@ export default async function DashboardPage() {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-slate-200 truncate">
-                      {row.job_description.slice(0, 80)}...
-                    </p>
+                    <EvaluationLabel
+                      evaluationId={row.id}
+                      initialLabel={row.label}
+                      fallbackText={row.job_description.slice(0, 80) + "..."}
+                    />
                     <div className="flex items-center gap-3 mt-2">
                       <div className="flex items-center gap-1 text-xs text-slate-500">
                         <Clock className="w-3 h-3" />

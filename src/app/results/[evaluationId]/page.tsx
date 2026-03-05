@@ -75,7 +75,7 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
           </Link>
           <div>
             <h1 className="text-xl font-bold text-slate-100">
-              Evaluation Results
+              {row.label || "Evaluation Results"}
             </h1>
             <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
               <Clock className="w-3 h-3" />

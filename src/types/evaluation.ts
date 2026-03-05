@@ -73,6 +73,7 @@ export interface EvaluationRow {
   ai_cons: string[] | null;
   ai_details: AIRecruiterResult | null;
   composite_score: number | null;
+  label: string | null;
   created_at: string;
 }
 
@@ -89,4 +90,44 @@ export interface UserRow {
   email: string;
   full_name: string | null;
   created_at: string;
+}
+
+/* ── Resume Improvement Suggestions ── */
+
+export interface SuggestionItem {
+  section: string;
+  currentText: string;
+  suggestedRewrite: string;
+  reasoning: string;
+  priority: "high" | "medium" | "low";
+}
+
+export interface SuggestionsResult {
+  suggestions: SuggestionItem[];
+  overallStrategy: string;
+}
+
+/* ── Keyword Placement Suggestions ── */
+
+export interface KeywordPlacement {
+  keyword: string;
+  importance: "critical" | "important" | "nice-to-have";
+  suggestedSection: string;
+  examplePhrase: string;
+}
+
+/* ── Section-by-Section Scoring ── */
+
+export interface SectionScore {
+  sectionName: string;
+  score: number;
+  feedback: string;
+  relevantKeywords: string[];
+  missingKeywords: string[];
+}
+
+export interface SectionScoringResult {
+  sections: SectionScore[];
+  strongestSection: string;
+  weakestSection: string;
 }
