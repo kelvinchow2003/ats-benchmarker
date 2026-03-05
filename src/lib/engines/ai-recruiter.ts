@@ -23,17 +23,17 @@ The JSON must exactly match this schema:
 }`;
 
 /**
- * Engine 3: AI Recruiter — Google Gemini 1.5 Flash structured evaluation.
+ * Engine 3: AI Recruiter — Google Gemini 2.5 Flash structured evaluation.
  */
 export async function runAIRecruiterEngine(
   resumeText: string,
   jobDescription: string
 ): Promise<AIRecruiterResult> {
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: "gemini-2.5-flash",
     generationConfig: {
       temperature: 0.3,
-      maxOutputTokens: 1024,
+      maxOutputTokens: 8192,
     },
   });
 
@@ -59,11 +59,20 @@ Respond with ONLY raw JSON matching the required schema. No markdown, no code fe
 
   const text = result.response.text().trim();
 
-  // Strip any accidental markdown fences
-  const cleaned = text
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
+  // Extract JSON from the response — handle markdown fences, thinking text, etc.
+  let cleaned = text;
+
+  // Try to extract JSON from markdown code fences first
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenceMatch) {
+    cleaned = fenceMatch[1].trim();
+  } else {
+    // Try to extract the first JSON object from the response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      cleaned = jsonMatch[0].trim();
+    }
+  }
 
   let parsed: {
     Score: number;
