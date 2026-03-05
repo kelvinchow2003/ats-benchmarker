@@ -1,21 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PDFParse } from "pdf-parse";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-async function extractText(data: Uint8Array): Promise<{ text: string; pages: number }> {
-  const parser = new PDFParse({ data: data as unknown as ArrayBuffer });
-  try {
-    const result = await parser.getText();
-    const info = await parser.getInfo();
-    return {
-      text: (result.text || "").trim(),
-      pages: info.total || 1,
-    };
-  } finally {
-    await parser.destroy();
+async function extractWithPdfjs(
+  data: Uint8Array
+): Promise<{ text: string; pages: number }> {
+  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  // Disable worker for serverless environment
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+
+  const loadingTask = pdfjsLib.getDocument({
+    data: new Uint8Array(data),
+    useWorkerFetch: false,
+    isEvalSupported: false,
+    useSystemFonts: true,
+    disableFontFace: true,
+    disableAutoFetch: true,
+    disableStream: true,
+  });
+  const pdf = await loadingTask.promise;
+
+  const pageTexts: string[] = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const strings: string[] = [];
+    for (const item of content.items) {
+      if ("str" in item && typeof item.str === "string") {
+        strings.push(item.str);
+      }
+    }
+    pageTexts.push(strings.join(" "));
   }
+  return { text: pageTexts.join("\n\n").trim(), pages: pdf.numPages };
+}
+
+async function extractWithPdfParse(
+  buffer: Buffer
+): Promise<{ text: string; pages: number }> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const pdfParse = require("pdf-parse");
+  const result = await pdfParse(buffer);
+  return { text: (result.text || "").trim(), pages: result.numpages || 1 };
 }
 
 export async function POST(request: NextRequest) {
@@ -47,16 +74,25 @@ export async function POST(request: NextRequest) {
     let fullText = "";
     let pageCount = 0;
 
+    // Try pdfjs-dist first, fall back to pdf-parse
     try {
-      const result = await extractText(uint8Array);
+      const result = await extractWithPdfjs(uint8Array);
       fullText = result.text;
       pageCount = result.pages;
-    } catch (parseError) {
-      console.error("PDF parsing failed:", parseError);
-      return NextResponse.json(
-        { error: "Failed to parse PDF. Try a different file." },
-        { status: 500 }
-      );
+    } catch (pdfjsError) {
+      console.warn("pdfjs-dist failed, trying pdf-parse:", pdfjsError);
+      try {
+        const buffer = Buffer.from(arrayBuffer);
+        const result = await extractWithPdfParse(buffer);
+        fullText = result.text;
+        pageCount = result.pages;
+      } catch (parseError) {
+        console.error("Both PDF parsers failed:", parseError);
+        return NextResponse.json(
+          { error: "Failed to parse PDF. Try a different file." },
+          { status: 500 }
+        );
+      }
     }
 
     if (!fullText) {
