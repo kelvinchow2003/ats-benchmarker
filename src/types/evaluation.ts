@@ -193,6 +193,10 @@ export interface ParsePDFResponse {
   pageCount: number;
 }
 
+/* ── Engine Weights ── */
+
+export type { EngineWeights } from "@/lib/weights";
+
 /* ── Database Row (matches Supabase schema) ── */
 
 export interface EvaluationRow {
@@ -213,6 +217,7 @@ export interface EvaluationRow {
   ai_cons: string[] | null;
   ai_details: AIRecruiterResult | null;
   composite_score: number | null;
+  custom_weights: { legacy: number; semantic: number; ai: number } | null;
   label: string | null;
   created_at: string;
 }

@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { EngineWeights } from "@/lib/weights";
 
 interface CompositeScoreProps {
   compositeScore: number;
   legacyScore: number;
   semanticScore: number;
   aiScore: number;
+  weights?: EngineWeights;
 }
 
 function getScoreColor(score: number): string {
@@ -28,6 +30,7 @@ export default function CompositeScore({
   legacyScore,
   semanticScore,
   aiScore,
+  weights,
 }: CompositeScoreProps) {
   const [animatedScore, setAnimatedScore] = useState(0);
 
@@ -61,9 +64,9 @@ export default function CompositeScore({
   const offset = arcLength - (arcLength * animatedScore) / 100;
 
   const engines = [
-    { name: "Legacy", score: legacyScore, color: "#f59e0b", weight: "30%" },
-    { name: "Semantic", score: semanticScore, color: "#38bdf8", weight: "30%" },
-    { name: "AI Recruiter", score: aiScore, color: "#a78bfa", weight: "40%" },
+    { name: "Legacy", score: legacyScore, color: "#f59e0b", weight: `${weights?.legacy ?? 30}%` },
+    { name: "Semantic", score: semanticScore, color: "#38bdf8", weight: `${weights?.semantic ?? 30}%` },
+    { name: "AI Recruiter", score: aiScore, color: "#a78bfa", weight: `${weights?.ai ?? 40}%` },
   ];
 
   return (

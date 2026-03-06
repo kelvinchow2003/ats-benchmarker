@@ -15,6 +15,7 @@ import {
   BarChart3,
   Clock,
 } from "lucide-react";
+import ExportButton from "@/components/results/ExportButton";
 import type { EvaluationRow, AIRecruiterResult } from "@/types/evaluation";
 
 interface ResultsPageProps {
@@ -92,11 +93,32 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
         {/* Composite Score */}
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-blue-400" />
-              <h2 className="text-sm font-semibold text-slate-200">
-                Composite Score
-              </h2>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-blue-400" />
+                <h2 className="text-sm font-semibold text-slate-200">
+                  Composite Score
+                </h2>
+              </div>
+              {aiResult && (
+                <ExportButton
+                  data={{
+                    compositeScore: Math.round(composite),
+                    legacyScore: Math.round(legacyScore),
+                    semanticScore: Math.round(semanticScore),
+                    aiScore: Math.round(aiScore),
+                    matchedKeywords: row.legacy_matched ?? [],
+                    missingKeywords: row.legacy_missing ?? [],
+                    aiVerdict: aiResult.verdict,
+                    aiFeedback: aiResult.feedback,
+                    aiPros: aiResult.pros,
+                    aiCons: aiResult.cons,
+                    label: row.label ?? undefined,
+                    date: createdAt,
+                    weights: row.custom_weights ?? undefined,
+                  }}
+                />
+              )}
             </div>
           </CardHeader>
           <CardContent>
@@ -105,6 +127,7 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
               legacyScore={Math.round(legacyScore)}
               semanticScore={Math.round(semanticScore)}
               aiScore={Math.round(aiScore)}
+              weights={row.custom_weights ?? undefined}
             />
           </CardContent>
         </Card>

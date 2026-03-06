@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState, type DragEvent } from "react";
 import { Upload, FileText, X, AlertCircle } from "lucide-react";
 import Button from "@/components/ui/Button";
+import TemplateSelector from "@/components/upload/TemplateSelector";
 
 interface UploadZoneProps {
   onSubmit: (pdfFile: File, jobDescription: string) => void;
@@ -150,9 +151,12 @@ export default function UploadZone({ onSubmit, isProcessing }: UploadZoneProps) 
 
       {/* Job Description */}
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          Job Description
-        </label>
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-sm font-medium text-slate-300">
+            Job Description
+          </label>
+          <TemplateSelector onSelect={(content) => setJd(content)} />
+        </div>
         <textarea
           value={jd}
           onChange={(e) => setJd(e.target.value)}

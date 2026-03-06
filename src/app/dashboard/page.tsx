@@ -2,31 +2,11 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createServerSupabaseClient, getUser } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
-import { BarChart3, Clock, ArrowRight, FileSearch } from "lucide-react";
+import { BarChart3, FileSearch, TrendingUp } from "lucide-react";
 import type { EvaluationRow } from "@/types/evaluation";
-import EvaluationLabel from "@/components/dashboard/EvaluationLabel";
-
-function getScoreBadgeVariant(
-  score: number | null
-): "success" | "info" | "warning" | "danger" {
-  if (!score) return "danger";
-  if (score >= 70) return "success";
-  if (score >= 50) return "info";
-  if (score >= 30) return "warning";
-  return "danger";
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+import ComparisonSelector from "@/components/dashboard/ComparisonSelector";
+import ScoreHistoryChart from "@/components/dashboard/ScoreHistoryChart";
 
 export default async function DashboardPage() {
   const user = await getUser();
@@ -59,6 +39,33 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
+      {/* Score History Chart */}
+      {rows.length >= 2 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-blue-400" />
+              <h2 className="text-sm font-semibold text-slate-200">
+                Score History
+              </h2>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ScoreHistoryChart
+              evaluations={rows.map((row) => ({
+                id: row.id,
+                compositeScore: Number(row.composite_score ?? 0),
+                legacyScore: Number(row.legacy_score ?? 0),
+                semanticScore: Number(row.semantic_score ?? 0),
+                aiScore: Number(row.ai_score ?? 0),
+                label: row.label,
+                createdAt: row.created_at,
+              }))}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       {rows.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center">
@@ -75,76 +82,7 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {rows.map((row) => (
-            <Link key={row.id} href={`/results/${row.id}`}>
-              <Card hover className="group">
-                <CardContent className="flex items-center gap-4">
-                  {/* Composite Score */}
-                  <div className="w-14 h-14 rounded-xl bg-slate-800 flex items-center justify-center shrink-0">
-                    <span className="text-lg font-bold font-mono text-slate-200">
-                      {row.composite_score != null
-                        ? Math.round(row.composite_score)
-                        : "—"}
-                    </span>
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <EvaluationLabel
-                      evaluationId={row.id}
-                      initialLabel={row.label}
-                      fallbackText={row.job_description.slice(0, 80) + "..."}
-                    />
-                    <div className="flex items-center gap-3 mt-2">
-                      <div className="flex items-center gap-1 text-xs text-slate-500">
-                        <Clock className="w-3 h-3" />
-                        {formatDate(row.created_at)}
-                      </div>
-                      {row.ai_verdict && (
-                        <Badge
-                          variant={getScoreBadgeVariant(row.ai_score as number | null)}
-                        >
-                          {row.ai_verdict}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Scores */}
-                  <div className="hidden sm:flex items-center gap-4 shrink-0">
-                    <div className="text-center">
-                      <p className="text-xs text-slate-500">Legacy</p>
-                      <p className="text-sm font-mono font-bold text-amber-500">
-                        {row.legacy_score != null
-                          ? Math.round(Number(row.legacy_score))
-                          : "—"}
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-slate-500">Semantic</p>
-                      <p className="text-sm font-mono font-bold text-sky-400">
-                        {row.semantic_score != null
-                          ? Math.round(Number(row.semantic_score))
-                          : "—"}
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-slate-500">AI</p>
-                      <p className="text-sm font-mono font-bold text-violet-400">
-                        {row.ai_score != null
-                          ? Math.round(Number(row.ai_score))
-                          : "—"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400 transition-colors shrink-0" />
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
+        <ComparisonSelector evaluations={rows} />
       )}
     </div>
   );

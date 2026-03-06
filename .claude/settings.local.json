@@ -3,7 +3,9 @@
     "allow": [
       "Bash(npm install)",
       "Bash(npm run build)",
-      "Bash(xargs grep -l \"signInWithOAuth\\\\|provider\\\\|google\\\\|github\")"
+      "Bash(xargs grep -l \"signInWithOAuth\\\\|provider\\\\|google\\\\|github\")",
+      "Bash(npm install jspdf html2canvas recharts)",
+      "Bash(npm install -D @types/html2canvas)"
     ]
   }
 }

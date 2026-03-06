@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import UploadZone from "@/components/upload/UploadZone";
 import ScoreCard from "@/components/results/ScoreCard";
@@ -44,7 +44,19 @@ import {
   FileCheck,
   Clock,
   Loader2,
+  SlidersHorizontal,
 } from "lucide-react";
+import WeightSliders from "@/components/evaluate/WeightSliders";
+import ExportButton from "@/components/results/ExportButton";
+import type { PDFExportData } from "@/lib/pdf-export";
+import {
+  loadWeights,
+  saveWeights,
+  computeComposite,
+  isDefaultWeights,
+  DEFAULT_WEIGHTS,
+  type EngineWeights,
+} from "@/lib/weights";
 
 export default function EvaluatePage() {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -69,6 +81,39 @@ export default function EvaluatePage() {
   const [compositeScore, setCompositeScore] = useState<number | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [label, setLabel] = useState("");
+  const [weights, setWeights] = useState<EngineWeights>(DEFAULT_WEIGHTS);
+  const [showWeights, setShowWeights] = useState(false);
+
+  // Load saved weights from localStorage (avoid SSR mismatch)
+  useEffect(() => {
+    setWeights(loadWeights());
+  }, []);
+
+  // Recalculate composite when weights change and results exist
+  const handleWeightsChange = useCallback(
+    (newWeights: EngineWeights) => {
+      setWeights(newWeights);
+      saveWeights(newWeights);
+      if (
+        legacy.status === "done" &&
+        semantic.status === "done" &&
+        ai.status === "done" &&
+        legacy.result &&
+        semantic.result &&
+        ai.result
+      ) {
+        setCompositeScore(
+          computeComposite(
+            legacy.result.score,
+            semantic.result.score,
+            ai.result.score,
+            newWeights
+          )
+        );
+      }
+    },
+    [legacy, semantic, ai]
+  );
 
   // Post-analysis states
   const [sectionScoring, setSectionScoring] = useState<
@@ -339,11 +384,11 @@ export default function EvaluatePage() {
         experienceMatchPromise,
       ]);
 
-      // Compute composite score
+      // Compute composite score using custom weights
       const ls = legacyResult?.score ?? 0;
       const ss = semanticResult?.score ?? 0;
       const as_ = aiResult?.score ?? 0;
-      const composite = Math.round(ls * 0.3 + ss * 0.3 + as_ * 0.4);
+      const composite = computeComposite(ls, ss, as_, weights);
       setCompositeScore(composite);
 
       setParseStatus(null);
@@ -385,6 +430,7 @@ export default function EvaluatePage() {
               ai_pros: aiResult.pros,
               ai_cons: aiResult.cons,
               ai_details: aiResult,
+              custom_weights: isDefaultWeights(weights) ? null : weights,
               label: label.trim() || null,
             })
             .select("id")
@@ -485,7 +531,7 @@ export default function EvaluatePage() {
         }
       }
     },
-    [label]
+    [label, weights]
   );
 
   return (
@@ -611,19 +657,62 @@ export default function EvaluatePage() {
           {allDone && compositeScore !== null && (
             <Card className="animate-fade-in-up">
               <CardHeader>
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-blue-400" />
-                  <h2 className="text-sm font-semibold text-slate-200">
-                    Composite Score
-                  </h2>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-blue-400" />
+                    <h2 className="text-sm font-semibold text-slate-200">
+                      Composite Score
+                    </h2>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowWeights((v) => !v)}
+                      className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                    >
+                      <SlidersHorizontal className="w-3.5 h-3.5" />
+                      Weights
+                    </button>
+                    {legacy.result && semantic.result && ai.result && (
+                      <ExportButton
+                        data={{
+                          compositeScore: compositeScore!,
+                          legacyScore: legacy.result.score,
+                          semanticScore: semantic.result.score,
+                          aiScore: ai.result.score,
+                          matchedKeywords: legacy.result.matchedKeywords,
+                          missingKeywords: legacy.result.missingKeywords,
+                          aiVerdict: ai.result.verdict,
+                          aiFeedback: ai.result.feedback,
+                          aiPros: ai.result.pros,
+                          aiCons: ai.result.cons,
+                          label: label || undefined,
+                          date: new Date().toLocaleDateString("en-US", {
+                            month: "long",
+                            day: "numeric",
+                            year: "numeric",
+                          }),
+                          weights,
+                        } satisfies PDFExportData}
+                      />
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
+                {showWeights && (
+                  <div className="mb-6 pb-6 border-b border-slate-800/60">
+                    <WeightSliders
+                      weights={weights}
+                      onChange={handleWeightsChange}
+                    />
+                  </div>
+                )}
                 <CompositeScore
                   compositeScore={compositeScore}
                   legacyScore={legacy.result?.score ?? 0}
                   semanticScore={semantic.result?.score ?? 0}
                   aiScore={ai.result?.score ?? 0}
+                  weights={weights}
                 />
               </CardContent>
             </Card>
