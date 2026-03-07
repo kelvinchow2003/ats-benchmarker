@@ -60,35 +60,39 @@ export async function runSemanticEngine(
   const trimmedResume = resumeText.slice(0, maxChars);
   const trimmedJD = jobDescription.slice(0, maxChars);
 
-  // Batch embed both texts in a single API call
-  const response = await cohere.embed({
-    texts: [trimmedResume, trimmedJD],
-    model: "embed-english-v3.0",
-    inputType: "search_document",
-  });
+  // Embed resume as a document, JD as a query (per Cohere best practices)
+  // search_document = the corpus being searched (resume)
+  // search_query = the query to match against (job description)
+  const [resumeResponse, jdResponse] = await Promise.all([
+    cohere.embed({
+      texts: [trimmedResume],
+      model: "embed-english-v3.0",
+      inputType: "search_document",
+    }),
+    cohere.embed({
+      texts: [trimmedJD],
+      model: "embed-english-v3.0",
+      inputType: "search_query",
+    }),
+  ]);
 
-  const embeddings = response.embeddings;
-
-  // Handle both float[][] and uint8[][] response formats
-  let resumeVec: number[];
-  let jdVec: number[];
-
-  if (Array.isArray(embeddings) && Array.isArray(embeddings[0])) {
-    resumeVec = embeddings[0] as number[];
-    jdVec = embeddings[1] as number[];
-  } else if (
-    typeof embeddings === "object" &&
-    embeddings !== null &&
-    "float" in embeddings
-  ) {
-    const floatEmbeddings = (
-      embeddings as { float: number[][] }
-    ).float;
-    resumeVec = floatEmbeddings[0];
-    jdVec = floatEmbeddings[1];
-  } else {
+  // Extract vectors from each response
+  function extractVector(embeddings: unknown): number[] {
+    if (Array.isArray(embeddings) && Array.isArray(embeddings[0])) {
+      return embeddings[0] as number[];
+    }
+    if (
+      typeof embeddings === "object" &&
+      embeddings !== null &&
+      "float" in embeddings
+    ) {
+      return (embeddings as { float: number[][] }).float[0];
+    }
     throw new Error("Unexpected Cohere embedding response format");
   }
+
+  const resumeVec = extractVector(resumeResponse.embeddings);
+  const jdVec = extractVector(jdResponse.embeddings);
 
   const rawSimilarity = cosineSimilarity(resumeVec, jdVec);
   const score = mapToScore(rawSimilarity);

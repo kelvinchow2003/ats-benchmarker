@@ -5,7 +5,10 @@
       "Bash(npm run build)",
       "Bash(xargs grep -l \"signInWithOAuth\\\\|provider\\\\|google\\\\|github\")",
       "Bash(npm install jspdf html2canvas recharts)",
-      "Bash(npm install -D @types/html2canvas)"
+      "Bash(npm install -D @types/html2canvas)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3000)"
     ]
   }
 }

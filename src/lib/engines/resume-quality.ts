@@ -200,8 +200,27 @@ export function runResumeQualityEngine(
     overallRating = "weak";
   }
 
-  // Score: weighted by metrics (60%) and action verbs (40%)
-  const score = Math.round(metricsRate * 60 + actionVerbRate * 40);
+  // Score: use a broader scale that accounts for bullet quality distribution
+  // - Strong bullets (action verb + metrics) should push toward 80-100
+  // - Moderate bullets (action verb OR metrics) should push toward 50-75
+  // - Having bullets at all is worth a base of 20 points
+  const strongRate = totalBullets > 0
+    ? bullets.filter((b) => b.rating === "strong").length / totalBullets
+    : 0;
+  const moderateRate = totalBullets > 0
+    ? bullets.filter((b) => b.rating === "moderate").length / totalBullets
+    : 0;
+
+  // Base score for having bullet-formatted content at all
+  const baseScore = totalBullets >= 3 ? 20 : totalBullets > 0 ? 10 : 0;
+  // Action verbs: up to 30 points
+  const verbScore = Math.min(30, Math.round(actionVerbRate * 30));
+  // Metrics: up to 30 points
+  const metricsScore = Math.min(30, Math.round(metricsRate * 30));
+  // Strong bullets bonus: up to 20 points
+  const strongBonus = Math.min(20, Math.round(strongRate * 25 + moderateRate * 10));
+
+  const score = Math.min(100, baseScore + verbScore + metricsScore + strongBonus);
 
   return {
     bullets,

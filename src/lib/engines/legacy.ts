@@ -66,6 +66,43 @@ const COMPOUND_PATTERNS = [
   /\b(customer\s+service)\b/gi,
   /\b(business\s+intelligence)\b/gi,
   /\b(quality\s+assurance)\b/gi,
+  // Additional compounds
+  /\b(web\s+development)\b/gi,
+  /\b(mobile\s+(?:app|application)\s+development)\b/gi,
+  /\b(mobile\s+development)\b/gi,
+  /\b(system\s+design)\b/gi,
+  /\b(api\s+development)\b/gi,
+  /\b(api\s+design)\b/gi,
+  /\b(database\s+management)\b/gi,
+  /\b(database\s+design)\b/gi,
+  /\b(software\s+development)\b/gi,
+  /\b(software\s+architecture)\b/gi,
+  /\b(technical\s+leadership)\b/gi,
+  /\b(technical\s+writing)\b/gi,
+  /\b(code\s+review)\b/gi,
+  /\b(pair\s+programming)\b/gi,
+  /\b(distributed\s+systems?)\b/gi,
+  /\b(event[\s-]driven)\b/gi,
+  /\b(real[\s-]time)\b/gi,
+  /\b(high\s+availability)\b/gi,
+  /\b(load\s+balancing)\b/gi,
+  /\b(continuous\s+integration)\b/gi,
+  /\b(continuous\s+deployment)\b/gi,
+  /\b(continuous\s+delivery)\b/gi,
+  /\b(responsive\s+design)\b/gi,
+  /\b(design\s+system)\b/gi,
+  /\b(a[\s/]?b\s+testing)\b/gi,
+  /\b(performance\s+optimization)\b/gi,
+  /\b(search\s+engine\s+optimization)\b/gi,
+  /\b(content\s+management)\b/gi,
+  /\b(user\s+research)\b/gi,
+  /\b(data\s+visualization)\b/gi,
+  /\b(data\s+modeling)\b/gi,
+  /\b(data\s+pipeline)\b/gi,
+  /\b(data\s+warehouse)\b/gi,
+  /\b(feature\s+engineering)\b/gi,
+  /\b(model\s+training)\b/gi,
+  /\b(model\s+deployment)\b/gi,
 ];
 
 /* ── Synonym / Acronym Map ──
@@ -142,6 +179,54 @@ const SYNONYM_MAP: Record<string, string[]> = {
   "oauth":        ["oauth2", "oauth 2.0"],
   "jwt":          ["json web token", "json web tokens"],
   "sso":          ["single sign-on", "single sign on"],
+  // Modern frameworks / runtimes
+  "remix":        ["remix.run"],
+  "svelte":       ["sveltekit", "svelte kit"],
+  "astro":        ["astro.build"],
+  "deno":         ["deno.land"],
+  "bun":          ["bunjs"],
+  "vite":         ["vitejs"],
+  // Modern tools / services
+  "supabase":     ["supa base"],
+  "prisma":       ["prisma orm"],
+  "drizzle":      ["drizzle orm"],
+  "trpc":         ["t3 stack"],
+  "redis":        ["elasticache", "memorydb"],
+  "kafka":        ["apache kafka", "confluent"],
+  "rabbitmq":     ["rabbit mq", "amqp"],
+  // Testing
+  "jest":         ["jestjs"],
+  "cypress":      ["cypress.io"],
+  "playwright":   ["pw"],
+  "vitest":       ["vitestjs"],
+  "selenium":     ["webdriver"],
+  // Design / UI
+  "figma":        ["figma design"],
+  "sketch":       ["sketch app"],
+  "storybook":    ["storybookjs"],
+  // Monitoring / observability
+  "datadog":      ["data dog"],
+  "grafana":      ["grafana cloud"],
+  "prometheus":   ["prom"],
+  "new relic":    ["newrelic"],
+  "sentry":       ["sentry.io"],
+  // Mobile
+  "react native": ["react-native", "rn"],
+  "flutter":      ["dart flutter"],
+  "swift":        ["swiftui"],
+  "kotlin":       ["kotlinx"],
+  // Infrastructure
+  "nginx":        ["engine x"],
+  "linux":        ["unix", "ubuntu", "centos", "debian"],
+  "ansible":      ["ansible playbook"],
+  "pulumi":       ["pulumi iac"],
+  "cloudformation": ["cfn", "aws cloudformation"],
+  // Methodologies
+  "responsive design": ["mobile-first", "mobile first"],
+  "accessibility": ["a11y", "wcag", "aria"],
+  "internationalization": ["i18n"],
+  "localization": ["l10n"],
+  "seo":          ["search engine optimization"],
 };
 
 /**
@@ -183,7 +268,15 @@ function extractKeywords(text: string): string[] {
     }
   }
 
-  // 2. Extract single words (skip those already in compounds)
+  // 2. Build a set of all individual words that are part of detected compounds
+  const wordsInCompounds = new Set<string>();
+  for (const compound of compoundsFound) {
+    for (const w of compound.split(/\s+/)) {
+      wordsInCompounds.add(w);
+    }
+  }
+
+  // 3. Extract single words (skip ALL words that are part of detected compounds)
   const words = normalized
     .replace(/[^a-z0-9#+.\s-]/g, " ")
     .split(/\s+/)
@@ -191,8 +284,8 @@ function extractKeywords(text: string): string[] {
 
   for (const word of words) {
     if (STOP_WORDS.has(word)) continue;
-    const inCompound = compoundsFound.some((c) => c.includes(word));
-    if (inCompound && word.length < 5) continue;
+    // Skip if this word is part of any detected compound phrase
+    if (wordsInCompounds.has(word)) continue;
     keywords.add(word);
   }
 
@@ -200,11 +293,50 @@ function extractKeywords(text: string): string[] {
 }
 
 /**
- * Test whether a single term exists in text via word-boundary regex.
+ * Test whether a single term exists in text.
+ * Uses word boundaries for normal words, but handles special characters
+ * (C#, C++, .NET, etc.) with lookahead/lookbehind or simple includes.
  */
 function termInText(term: string, text: string): boolean {
+  const lower = term.toLowerCase();
+  const textLower = text.toLowerCase();
+
+  // Special-case terms that break \b word boundaries
+  if (lower === "c#" || lower === "csharp" || lower === "c-sharp") {
+    return /\bc#/i.test(text) || /\bcsharp\b/i.test(text) || /\bc-sharp\b/i.test(text);
+  }
+  if (lower === "c++") {
+    return /\bc\+\+/i.test(text);
+  }
+  if (lower === ".net" || lower === "dotnet") {
+    return /\.net\b/i.test(text) || /\bdotnet\b/i.test(text);
+  }
+  if (lower === "node.js" || lower === "nodejs") {
+    return /\bnode\.?js\b/i.test(text) || /\bnode\.js\b/i.test(text);
+  }
+  if (lower === "next.js" || lower === "nextjs") {
+    return /\bnext\.?js\b/i.test(text);
+  }
+  if (lower === "vue.js" || lower === "vuejs") {
+    return /\bvue\.?js\b/i.test(text);
+  }
+  if (lower === "react.js" || lower === "reactjs") {
+    return /\breact\.?js\b/i.test(text) || /\breact\b/i.test(text);
+  }
+  if (lower === "express.js" || lower === "expressjs") {
+    return /\bexpress\.?js\b/i.test(text) || /\bexpress\b/i.test(text);
+  }
+  if (lower === "nuxt.js" || lower === "nuxtjs") {
+    return /\bnuxt\.?js\b/i.test(text);
+  }
+
+  // Standard word boundary matching
   const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`\\b${escaped}\\b`, "i").test(text);
+  // For short terms (2-3 chars), require case-insensitive exact boundary
+  if (term.length <= 3) {
+    return new RegExp(`(?:^|[\\s,;:()/])${escaped}(?:$|[\\s,;:()/])`, "i").test(` ${text} `);
+  }
+  return new RegExp(`\\b${escaped}\\b`, "i").test(textLower);
 }
 
 /**

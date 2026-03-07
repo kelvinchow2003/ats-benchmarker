@@ -231,6 +231,21 @@ function isSectionHeader(line: string): boolean {
 }
 
 /**
+ * Check if a line looks like a section header (short, title-like).
+ */
+function isLikelyHeader(line: string): boolean {
+  const trimmed = line.trim();
+  if (trimmed.length === 0 || trimmed.length > 80) return false;
+  // Lines ending with ":"
+  if (trimmed.endsWith(":")) return true;
+  // Short ALL CAPS lines
+  if (trimmed.length < 50 && trimmed === trimmed.toUpperCase() && /[A-Z]/.test(trimmed)) return true;
+  // Title case short lines (no sentences — no periods inside)
+  if (trimmed.length < 50 && /^[A-Z]/.test(trimmed) && !trimmed.includes(".") && trimmed.split(/\s+/).length <= 6) return true;
+  return false;
+}
+
+/**
  * Engine: Resume Structure Scoring.
  * Evaluates whether the resume has expected sections, appropriate length,
  * consistent formatting patterns, and good information density.
@@ -243,12 +258,27 @@ export function runStructureScoringEngine(
   const totalLines = lines.length;
   const totalWords = resumeText.split(/\s+/).filter(Boolean).length;
 
+  // Identify lines that look like section headers
+  const headerLines = lines.filter(isLikelyHeader);
+  // Also build a header-only text for matching section patterns
+  const headerText = headerLines.join("\n");
+
   // 1. Detect sections present
+  // For Contact Information, search the full text (contact details appear inline, not as headers)
+  // For all other sections, search only header lines to avoid false positives
   const sectionsFound: SectionPresence[] = [];
   let foundOrder = 0;
 
   for (const section of SECTION_DEFINITIONS) {
-    const found = section.patterns.some((p) => p.test(resumeText));
+    let found: boolean;
+    if (section.name === "Contact Information") {
+      // Contact info appears inline (emails, phone numbers, URLs) — search full text
+      found = section.patterns.some((p) => p.test(resumeText));
+    } else {
+      // Other sections should be detected via headers only to avoid false positives
+      // (e.g., the word "project" in a bullet shouldn't mark "Projects" as found)
+      found = section.patterns.some((p) => p.test(headerText));
+    }
     sectionsFound.push({
       name: section.name,
       found,

@@ -165,7 +165,7 @@ export function runRequirementPriorityEngine(
   const lines = jobDescription.split(/\n/).map((l) => l.trim()).filter(Boolean);
 
   const requirements: PrioritizedRequirement[] = [];
-  let currentSectionPriority: RequirementPriority = "required"; // default
+  let currentSectionPriority: RequirementPriority = "preferred"; // default: assume preferred unless signaled otherwise
 
   for (const line of lines) {
     // Check if this is a section header
