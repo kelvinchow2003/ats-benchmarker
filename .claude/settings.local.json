@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l /c/Users/kelvi/Downloads/ats-benchmarker_1/ats-benchmarker/src/lib/engines/*.ts)",
+      "Bash(npm install -D vitest)",
+      "Bash(npm test)"
+    ]
+  }
+}
