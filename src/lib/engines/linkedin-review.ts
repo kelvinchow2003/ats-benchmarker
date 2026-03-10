@@ -62,47 +62,105 @@ function extractMetaProperty(html: string, property: string): string | null {
 }
 
 /**
+ * Attempt a single fetch with given headers. Returns HTML or null.
+ */
+async function tryFetch(
+  url: string,
+  headers: Record<string, string>
+): Promise<string | null> {
+  try {
+    const response = await fetch(url, {
+      headers,
+      redirect: "follow",
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return null;
+    return await response.text();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if LinkedIn HTML is a login wall / auth gate.
+ */
+function isAuthWall(html: string): boolean {
+  return (
+    html.includes("authwall") ||
+    html.includes("/login") ||
+    html.includes("/checkpoint/") ||
+    html.includes("join?trk=") ||
+    html.includes("uas/login")
+  );
+}
+
+/** Header sets to try, ordered by likelihood of success. */
+const FETCH_STRATEGIES: Record<string, string>[] = [
+  // Strategy 1: Full modern Chrome fingerprint with Sec-Fetch headers
+  {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    Accept:
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Cache-Control": "no-cache",
+    Pragma: "no-cache",
+    "Sec-Ch-Ua":
+      '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"Windows"',
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+  },
+  // Strategy 2: Simulate coming from Google search results
+  {
+    "User-Agent":
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    Accept:
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    Referer: "https://www.google.com/",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "cross-site",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+  },
+  // Strategy 3: Simpler bot-friendly fetch (LinkedIn shows OG metadata to bots)
+  {
+    "User-Agent":
+      "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+    Accept: "text/html",
+  },
+];
+
+/**
  * Fetch a LinkedIn profile page and extract whatever text data is available.
- * LinkedIn blocks most scrapers, so this is best-effort.
+ * LinkedIn blocks most scrapers, so this tries multiple strategies.
  * Returns a combined text string of extracted profile information.
  * Throws if the profile is inaccessible or returns no useful data.
  */
 export async function fetchLinkedInProfile(url: string): Promise<string> {
-  let html: string;
+  let html: string | null = null;
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-      redirect: "follow",
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+  // Try each strategy until one succeeds and isn't an auth wall
+  for (const headers of FETCH_STRATEGIES) {
+    const result = await tryFetch(url, headers);
+    if (result && !isAuthWall(result)) {
+      html = result;
+      break;
     }
+    // If we got HTML but it was an auth wall, keep trying other strategies
+  }
 
-    html = await response.text();
-  } catch {
+  if (!html) {
     throw new Error(
       "Could not access this LinkedIn profile. The profile may be private " +
         "or LinkedIn may be blocking access. Please paste your profile text instead."
-    );
-  }
-
-  // Check for login wall
-  if (
-    html.includes("authwall") ||
-    html.includes("/login") ||
-    html.includes("/checkpoint/")
-  ) {
-    throw new Error(
-      "LinkedIn is requiring sign-in to view this profile. " +
-        "Please paste your profile text instead."
     );
   }
 

@@ -7,16 +7,19 @@ import {
   AlertCircle,
   AlertTriangle,
   FileText,
+  Globe,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import LinkedInReviewPanel from "@/components/results/LinkedInReviewPanel";
 import type { LinkedInReviewResult, EngineState } from "@/types/evaluation";
 
+type InputMode = "url" | "paste";
+
 export default function LinkedInReviewPage() {
+  const [mode, setMode] = useState<InputMode>("url");
   const [linkedinInput, setLinkedinInput] = useState("");
   const [pasteText, setPasteText] = useState("");
-  const [showPasteFallback, setShowPasteFallback] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const [reviewState, setReviewState] = useState<
@@ -37,7 +40,6 @@ export default function LinkedInReviewPage() {
 
     setReviewState({ status: "running", result: null, error: null });
     setFetchError(null);
-    setShowPasteFallback(false);
 
     try {
       const res = await fetch("/api/engines/linkedin-review", {
@@ -50,7 +52,7 @@ export default function LinkedInReviewPage() {
         const errData = await res.json().catch(() => ({}));
         const errorMessage = errData.error || "LinkedIn review failed";
 
-        // Check if this is a fetch/access error → show paste fallback
+        // Check if this is a fetch/access error → show warning + switch to paste
         if (
           errorMessage.includes("paste your profile text") ||
           errorMessage.includes("Could not access") ||
@@ -58,7 +60,7 @@ export default function LinkedInReviewPage() {
           errorMessage.includes("Could not extract")
         ) {
           setFetchError(errorMessage);
-          setShowPasteFallback(true);
+          setMode("paste");
           setReviewState({ status: "idle", result: null, error: null });
           return;
         }
@@ -130,98 +132,133 @@ export default function LinkedInReviewPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {/* URL Input */}
-            <div className="relative">
-              <Linkedin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input
-                type="text"
-                value={linkedinInput}
-                onChange={(e) => setLinkedinInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && canSubmitUrl) {
-                    handleUrlSubmit();
-                  }
+            {/* Mode toggle tabs */}
+            <div className="flex rounded-xl bg-slate-900/50 border border-slate-700 p-1 gap-1">
+              <button
+                onClick={() => {
+                  setMode("url");
+                  setFetchError(null);
                 }}
-                placeholder="e.g., johndoe or https://linkedin.com/in/johndoe"
-                className="w-full bg-slate-900/50 border border-slate-700 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all"
-              />
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg transition-all ${
+                  mode === "url"
+                    ? "bg-slate-700/70 text-slate-100 font-medium shadow-sm"
+                    : "text-slate-400 hover:text-slate-300"
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5" />
+                Profile URL
+              </button>
+              <button
+                onClick={() => setMode("paste")}
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg transition-all ${
+                  mode === "paste"
+                    ? "bg-slate-700/70 text-slate-100 font-medium shadow-sm"
+                    : "text-slate-400 hover:text-slate-300"
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Paste Text
+              </button>
             </div>
-            <p className="text-xs text-slate-500">
-              Enter a LinkedIn profile URL or username to review
-            </p>
 
-            <Button
-              onClick={handleUrlSubmit}
-              loading={reviewState.status === "running" && !showPasteFallback}
-              disabled={!canSubmitUrl}
-              className="w-full"
-            >
-              {reviewState.status === "running" && !showPasteFallback
-                ? "Fetching profile..."
-                : "Review Profile"}
-            </Button>
-
-            {/* Fetch error + paste fallback */}
-            {fetchError && (
-              <div className="space-y-4">
-                {/* Warning banner */}
-                <div className="flex items-start gap-2.5 bg-amber-500/5 border border-amber-500/20 rounded-xl px-4 py-3">
-                  <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                  <p className="text-sm text-amber-200/80">{fetchError}</p>
+            {/* URL input mode */}
+            {mode === "url" && (
+              <div className="space-y-3">
+                <div className="relative">
+                  <Linkedin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input
+                    type="text"
+                    value={linkedinInput}
+                    onChange={(e) => setLinkedinInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && canSubmitUrl) {
+                        handleUrlSubmit();
+                      }
+                    }}
+                    placeholder="e.g., johndoe or https://linkedin.com/in/johndoe"
+                    className="w-full bg-slate-900/50 border border-slate-700 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all"
+                  />
                 </div>
+                <p className="text-xs text-slate-500">
+                  Enter a LinkedIn profile URL or username.{" "}
+                  <span className="text-slate-500/70">
+                    Note: LinkedIn may block access — if so, use the Paste Text
+                    tab instead.
+                  </span>
+                </p>
 
-                {/* Paste fallback textarea */}
-                {showPasteFallback && (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-slate-400" />
-                      <span className="text-sm font-medium text-slate-300">
-                        Paste your profile text instead
-                      </span>
-                    </div>
-                    <textarea
-                      value={pasteText}
-                      onChange={(e) => setPasteText(e.target.value)}
-                      placeholder="Paste your LinkedIn profile text here — include your headline, summary, experience, skills, and education..."
-                      rows={10}
-                      className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all resize-y"
-                    />
+                <Button
+                  onClick={handleUrlSubmit}
+                  loading={reviewState.status === "running"}
+                  disabled={!canSubmitUrl}
+                  className="w-full"
+                >
+                  {reviewState.status === "running"
+                    ? "Fetching profile..."
+                    : "Review Profile"}
+                </Button>
+              </div>
+            )}
 
-                    {/* How to copy instructions */}
-                    <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg px-4 py-3">
-                      <p className="text-xs font-medium text-slate-300 mb-2">
-                        How to copy your LinkedIn profile text:
-                      </p>
-                      <ol className="text-xs text-slate-400 space-y-1.5 list-decimal list-inside">
-                        <li>
-                          Open your{" "}
-                          <a
-                            href="https://www.linkedin.com/in/me"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-400 hover:text-blue-300 underline underline-offset-2"
-                          >
-                            LinkedIn profile
-                          </a>{" "}
-                          in a browser
-                        </li>
-                        <li>Select all text on the page (Ctrl+A / Cmd+A)</li>
-                        <li>Copy (Ctrl+C / Cmd+C) and paste it above</li>
-                      </ol>
-                    </div>
-
-                    <Button
-                      onClick={handlePasteSubmit}
-                      loading={reviewState.status === "running"}
-                      disabled={!canSubmitPaste}
-                      className="w-full"
-                    >
-                      {reviewState.status === "running"
-                        ? "Reviewing profile..."
-                        : "Review Profile"}
-                    </Button>
+            {/* Paste text mode */}
+            {mode === "paste" && (
+              <div className="space-y-3">
+                {/* Show warning if switched from failed URL fetch */}
+                {fetchError && (
+                  <div className="flex items-start gap-2.5 bg-amber-500/5 border border-amber-500/20 rounded-xl px-4 py-3">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                    <p className="text-sm text-amber-200/80">
+                      {fetchError} You can paste your profile text below
+                      instead.
+                    </p>
                   </div>
                 )}
+
+                <textarea
+                  value={pasteText}
+                  onChange={(e) => setPasteText(e.target.value)}
+                  placeholder="Paste your LinkedIn profile text here — include your headline, summary, experience, skills, and education..."
+                  rows={10}
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all resize-y"
+                />
+
+                {/* How to copy instructions */}
+                <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg px-4 py-3">
+                  <p className="text-xs font-medium text-slate-300 mb-2">
+                    How to copy your LinkedIn profile text:
+                  </p>
+                  <ol className="text-xs text-slate-400 space-y-1.5 list-decimal list-inside">
+                    <li>
+                      Open your{" "}
+                      <a
+                        href="https://www.linkedin.com/in/me"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 underline underline-offset-2"
+                      >
+                        LinkedIn profile
+                      </a>{" "}
+                      in a browser
+                    </li>
+                    <li>
+                      Scroll down to load all sections (Experience, Education,
+                      Skills, etc.)
+                    </li>
+                    <li>Select all text on the page (Ctrl+A / Cmd+A)</li>
+                    <li>Copy (Ctrl+C / Cmd+C) and paste it above</li>
+                  </ol>
+                </div>
+
+                <Button
+                  onClick={handlePasteSubmit}
+                  loading={reviewState.status === "running"}
+                  disabled={!canSubmitPaste}
+                  className="w-full"
+                >
+                  {reviewState.status === "running"
+                    ? "Reviewing profile..."
+                    : "Review Profile"}
+                </Button>
               </div>
             )}
           </div>
