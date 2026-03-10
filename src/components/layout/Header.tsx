@@ -11,6 +11,7 @@ import {
   LogOut,
   FileSearch,
   User,
+  Github,
 } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -60,6 +61,13 @@ export default function Header() {
             <Button variant="ghost" size="sm">
               <FileSearch className="w-4 h-4" />
               <span className="hidden sm:inline">Evaluate</span>
+            </Button>
+          </Link>
+
+          <Link href="/github">
+            <Button variant="ghost" size="sm">
+              <Github className="w-4 h-4" />
+              <span className="hidden sm:inline">GitHub Review</span>
             </Button>
           </Link>
 

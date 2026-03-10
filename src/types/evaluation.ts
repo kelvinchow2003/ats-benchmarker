@@ -162,6 +162,49 @@ export interface AIRecruiterResult {
   cons: string[];
 }
 
+/* ── GitHub Profile Review ── */
+
+export interface GitHubRepo {
+  name: string;
+  description: string | null;
+  language: string | null;
+  stars: number;
+  url: string;
+}
+
+export interface GitHubProfileData {
+  username: string;
+  name: string | null;
+  bio: string | null;
+  publicRepos: number;
+  followers: number;
+  profileUrl: string;
+  repos: GitHubRepo[];
+}
+
+export interface GitHubRepoHighlight {
+  name: string;
+  relevance: string;
+}
+
+export interface GitHubReviewResult {
+  score: number;
+  verdict:
+    | "Strong Match"
+    | "Moderate Match"
+    | "Weak Match"
+    | "Not a Fit"
+    | "Excellent"
+    | "Good"
+    | "Needs Work"
+    | "Getting Started";
+  feedback: string;
+  strengths: string[];
+  improvements: string[];
+  repoHighlights: GitHubRepoHighlight[];
+  profileData: GitHubProfileData;
+}
+
 /* ── Composite ── */
 
 export interface CompositeResult {

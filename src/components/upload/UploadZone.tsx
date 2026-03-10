@@ -1,18 +1,19 @@
 "use client";
 
 import { useCallback, useRef, useState, type DragEvent } from "react";
-import { Upload, FileText, X, AlertCircle } from "lucide-react";
+import { Upload, FileText, X, AlertCircle, Github } from "lucide-react";
 import Button from "@/components/ui/Button";
 import TemplateSelector from "@/components/upload/TemplateSelector";
 
 interface UploadZoneProps {
-  onSubmit: (pdfFile: File, jobDescription: string) => void;
+  onSubmit: (pdfFile: File, jobDescription: string, githubUsername?: string) => void;
   isProcessing: boolean;
 }
 
 export default function UploadZone({ onSubmit, isProcessing }: UploadZoneProps) {
   const [file, setFile] = useState<File | null>(null);
   const [jd, setJd] = useState("");
+  const [githubInput, setGithubInput] = useState("");
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -72,7 +73,7 @@ export default function UploadZone({ onSubmit, isProcessing }: UploadZoneProps) 
       return;
     }
     setError(null);
-    onSubmit(file, jd.trim());
+    onSubmit(file, jd.trim(), githubInput.trim() || undefined);
   }
 
   return (
@@ -168,6 +169,27 @@ export default function UploadZone({ onSubmit, isProcessing }: UploadZoneProps) 
           {jd.length > 0
             ? `${jd.split(/\s+/).filter(Boolean).length} words`
             : "Tip: Include the full listing for best results"}
+        </p>
+      </div>
+
+      {/* GitHub Profile (Optional) */}
+      <div>
+        <label className="block text-sm font-medium text-slate-300 mb-2">
+          GitHub Profile{" "}
+          <span className="text-slate-500 font-normal">(optional)</span>
+        </label>
+        <div className="relative">
+          <Github className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <input
+            type="text"
+            value={githubInput}
+            onChange={(e) => setGithubInput(e.target.value)}
+            placeholder="e.g., octocat or https://github.com/octocat"
+            className="w-full bg-slate-900/50 border border-slate-700 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all"
+          />
+        </div>
+        <p className="text-xs text-slate-500 mt-1.5">
+          Add your GitHub to get a recruiter-perspective review of your profile
         </p>
       </div>
 

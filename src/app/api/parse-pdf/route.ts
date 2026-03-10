@@ -69,25 +69,25 @@ export async function POST(request: NextRequest) {
     }
 
     const arrayBuffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
 
     let fullText = "";
     let pageCount = 0;
 
-    // Try pdfjs-dist first, fall back to pdf-parse
+    // Try pdf-parse first (reliable in serverless), fall back to pdfjs-dist
     try {
-      const result = await extractWithPdfjs(uint8Array);
+      const buffer = Buffer.from(arrayBuffer);
+      const result = await extractWithPdfParse(buffer);
       fullText = result.text;
       pageCount = result.pages;
-    } catch (pdfjsError) {
-      console.warn("pdfjs-dist failed, trying pdf-parse:", pdfjsError);
+    } catch (parseError) {
+      console.warn("pdf-parse failed, trying pdfjs-dist:", parseError);
       try {
-        const buffer = Buffer.from(arrayBuffer);
-        const result = await extractWithPdfParse(buffer);
+        const uint8Array = new Uint8Array(arrayBuffer);
+        const result = await extractWithPdfjs(uint8Array);
         fullText = result.text;
         pageCount = result.pages;
-      } catch (parseError) {
-        console.error("Both PDF parsers failed:", parseError);
+      } catch (pdfjsError) {
+        console.error("Both PDF parsers failed:", pdfjsError);
         return NextResponse.json(
           { error: "Failed to parse PDF. Try a different file." },
           { status: 500 }

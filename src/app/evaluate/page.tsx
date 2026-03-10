@@ -14,6 +14,7 @@ import ResumeQualityPanel from "@/components/results/ResumeQualityPanel";
 import ActionVerbPanel from "@/components/results/ActionVerbPanel";
 import StructureScorePanel from "@/components/results/StructureScorePanel";
 import ExperienceMatchPanel from "@/components/results/ExperienceMatchPanel";
+import GitHubReviewPanel from "@/components/results/GitHubReviewPanel";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import ProgressBar from "@/components/ui/ProgressBar";
@@ -30,6 +31,7 @@ import type {
   ActionVerbAnalysisResult,
   StructureScoringResult,
   ExperienceMatchResult,
+  GitHubReviewResult,
 } from "@/types/evaluation";
 import {
   Cpu,
@@ -45,6 +47,7 @@ import {
   Clock,
   Loader2,
   SlidersHorizontal,
+  Github,
 } from "lucide-react";
 import WeightSliders from "@/components/evaluate/WeightSliders";
 import ExportButton from "@/components/results/ExportButton";
@@ -126,6 +129,11 @@ export default function EvaluatePage() {
     EngineState<SuggestionsResult>
   >({ status: "idle", result: null, error: null });
 
+  // GitHub review state
+  const [githubReview, setGithubReview] = useState<
+    EngineState<GitHubReviewResult>
+  >({ status: "idle", result: null, error: null });
+
   // Free analysis states (run in parallel with main engines)
   const [requirementPriority, setRequirementPriority] = useState<
     EngineState<RequirementPriorityResult>
@@ -149,7 +157,7 @@ export default function EvaluatePage() {
     ai.status === "done";
 
   const handleSubmit = useCallback(
-    async (pdfFile: File, jobDescription: string) => {
+    async (pdfFile: File, jobDescription: string, githubUsername?: string) => {
       setIsProcessing(true);
       setCompositeScore(null);
       setSavedId(null);
@@ -164,6 +172,7 @@ export default function EvaluatePage() {
       setActionVerbAnalysis({ status: "idle", result: null, error: null });
       setStructureScoring({ status: "idle", result: null, error: null });
       setExperienceMatch({ status: "idle", result: null, error: null });
+      setGithubReview({ status: "idle", result: null, error: null });
 
       // Step 1: Parse PDF
       setParseStatus("Extracting text from PDF...");
@@ -528,6 +537,38 @@ export default function EvaluatePage() {
             result: null,
             error: "Suggestions failed",
           });
+        }
+
+        // GitHub profile review (only if username was provided)
+        if (githubUsername) {
+          try {
+            setGithubReview((s) => ({ ...s, status: "running" }));
+            const res = await fetch("/api/engines/github-review", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                githubUsername,
+                jobDescription,
+              }),
+            });
+            if (res.ok) {
+              const data: GitHubReviewResult = await res.json();
+              setGithubReview({ status: "done", result: data, error: null });
+            } else {
+              const errData = await res.json().catch(() => ({}));
+              setGithubReview({
+                status: "error",
+                result: null,
+                error: errData.error || "GitHub review failed",
+              });
+            }
+          } catch {
+            setGithubReview({
+              status: "error",
+              result: null,
+              error: "GitHub review failed",
+            });
+          }
         }
       }
     },
@@ -956,6 +997,39 @@ export default function EvaluatePage() {
               </CardHeader>
               <CardContent>
                 <AIFeedbackPanel result={ai.result} />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* GitHub Profile Review */}
+          {githubReview.status !== "idle" && (
+            <Card className="animate-fade-in-up">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Github className="w-4 h-4 text-slate-300" />
+                  <h2 className="text-sm font-semibold text-slate-200">
+                    GitHub Profile Review
+                  </h2>
+                  {githubReview.status === "running" && (
+                    <Loader2 className="w-3.5 h-3.5 text-slate-500 animate-spin" />
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {githubReview.status === "running" && (
+                  <p className="text-sm text-slate-500">
+                    Reviewing GitHub profile...
+                  </p>
+                )}
+                {githubReview.status === "done" &&
+                  githubReview.result && (
+                    <GitHubReviewPanel result={githubReview.result} />
+                  )}
+                {githubReview.status === "error" && (
+                  <p className="text-sm text-red-400/80">
+                    {githubReview.error || "GitHub review unavailable"}
+                  </p>
+                )}
               </CardContent>
             </Card>
           )}
