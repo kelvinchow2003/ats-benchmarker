@@ -205,6 +205,31 @@ export interface GitHubReviewResult {
   profileData: GitHubProfileData;
 }
 
+/* ── LinkedIn Profile Review ── */
+
+export interface LinkedInProfileData {
+  name: string | null;
+  headline: string | null;
+  summary: string | null;
+  profileText: string;
+  linkedinUrl?: string;
+}
+
+export interface LinkedInSectionHighlight {
+  section: string;
+  feedback: string;
+}
+
+export interface LinkedInReviewResult {
+  score: number;
+  verdict: "Excellent" | "Good" | "Needs Work" | "Getting Started";
+  feedback: string;
+  strengths: string[];
+  improvements: string[];
+  sectionHighlights: LinkedInSectionHighlight[];
+  profileData: LinkedInProfileData;
+}
+
 /* ── Composite ── */
 
 export interface CompositeResult {
